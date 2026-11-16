@@ -28,9 +28,9 @@ const Users = [
     username: "Antonette",
     email: "Shanna@melissa.tv",
     address: {
-      street: "Victor Plains",
+      street: "Kulas Light",
       suite: "Suite 879",
-      city: "Wisokyburgh",
+      city: "Gwenborough",
       zipcode: "90566-7771",
       geo: {
         lat: "-43.9509",
@@ -97,9 +97,9 @@ const Users = [
     username: "Kamren",
     email: "Lucio_Hettinger@annie.ca",
     address: {
-      street: "Skiles Walks",
+      street: "Victor Plains",
       suite: "Suite 351",
-      city: "Roscoeview",
+      city: "Gwenborough",
       zipcode: "33263",
       geo: {
         lat: "-31.8129",
@@ -120,9 +120,9 @@ const Users = [
     username: "Leopoldo_Corkery",
     email: "Karley_Dach@jasper.info",
     address: {
-      street: "Norberto Crossing",
+      street: "Hoeger Mall",
       suite: "Apt. 950",
-      city: "South Christy",
+      city: "South Elvis",
       zipcode: "23505-1337",
       geo: {
         lat: "-71.4197",
@@ -143,9 +143,9 @@ const Users = [
     username: "Elwyn.Skiles",
     email: "Telly.Hoeger@billy.biz",
     address: {
-      street: "Rex Trail",
+      street: "Douglas Extension",
       suite: "Suite 280",
-      city: "Howemouth",
+      city: "McKenziehaven",
       zipcode: "58804-1099",
       geo: {
         lat: "24.8918",
@@ -166,9 +166,9 @@ const Users = [
     username: "Maxime_Nienow",
     email: "Sherwood@rosamond.me",
     address: {
-      street: "Ellsworth Summit",
+      street: "Rex Trail",
       suite: "Suite 729",
-      city: "Aliyaview",
+      city: "South Elvis",
       zipcode: "45169",
       geo: {
         lat: "-14.3990",
@@ -191,7 +191,7 @@ const Users = [
     address: {
       street: "Dayna Park",
       suite: "Suite 449",
-      city: "Bartholomebury",
+      city: "McKenziehaven",
       zipcode: "76495-3109",
       geo: {
         lat: "24.6463",
@@ -212,9 +212,9 @@ const Users = [
     username: "Moriah.Stanton",
     email: "Rey.Padberg@karina.biz",
     address: {
-      street: "Kattie Turnpike",
+      street: "Victor Plains",
       suite: "Suite 198",
-      city: "Lebsackbury",
+      city: "Gwenborough",
       zipcode: "31428-2261",
       geo: {
         lat: "-38.2386",

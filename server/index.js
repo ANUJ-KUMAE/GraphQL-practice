@@ -1,5 +1,5 @@
 const express = require('express');
-const {ApolloServer} = require('@apollo/server');
+const { ApolloServer } = require('@apollo/server');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const { expressMiddleware } = require('@as-integrations/express4');
@@ -55,6 +55,7 @@ async function startServer() {
                 getAllTodos: [Todo]
                 getAllUsers: [Users]
                 getAllUsersBasedONID(id: ID!): Users
+                getUsersByCity(city: String): [Users!]!
             }
         `,
 
@@ -68,9 +69,12 @@ async function startServer() {
             Query: {
                 getAllTodos: () => TODOS,
                 getAllUsers: () => Users,
-                getAllUsersBasedONID: (_, {id}) => {
+                getAllUsersBasedONID: (_, { id }) => {
                     const user = Users.find(user => user.id === parseInt(id));
                     return user;
+                },
+                getUsersByCity: (_, { city }) => {
+                    return Users.filter(user => user.address.city.toLowerCase() === city.toLowerCase());
                 }
             }
         }
@@ -82,13 +86,13 @@ async function startServer() {
 
     await server.start();
 
-     app.use(
+    app.use(
         '/graphql',
         cors(),
         express.json(),
         expressMiddleware(server)
     );
-    app.listen({port: 8000}, () => {
+    app.listen({ port: 8000 }, () => {
         console.log(`Server is running on port 8000`)
     })
 }
