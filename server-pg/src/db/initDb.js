@@ -59,7 +59,19 @@ export async function initDb() {
       ON "${SCHEMA}"."EmployeeProject" ("employeeId", "projectId");
     `);
 
-    console.log(`🎉 SUCCESS! Schema "${SCHEMA}" and all tables ("Department", "Employee", "Project", "EmployeeProject") are verified/created in PostgreSQL!`);
+    await client.query(`
+          CREATE TABLE IF NOT EXISTS "${SCHEMA}"."User" (
+          id SERIAL PRIMARY KEY,
+          name TEXT NOT NULL,
+          email TEXT UNIQUE NOT NULL,
+          password TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'EMPLOYEE',
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+    `)
+
+    console.log(`🎉 SUCCESS! Schema "${SCHEMA}" and all tables ("Department", "Employee", "Project", "EmployeeProject", "User") are verified/created in PostgreSQL!`);
   } catch (error) {
     console.error(`❌ Error initializing database:`, error);
     throw error;

@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import {
   fetchGraphQL,
   GET_INITIAL_DATA,
+  ME_QUERY,
+  LOGIN_MUTATION,
+  REGISTER_MUTATION,
   CREATE_DEPARTMENT,
   CREATE_EMPLOYEE,
   DELETE_EMPLOYEE,
@@ -13,14 +16,25 @@ import {
 import './App.css';
 
 function App() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authChecking, setAuthChecking] = useState(true);
   const [departments, setDepartments] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [projects, setProjects] = useState([]);
   const [employeeProjects, setEmployeeProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState('');
-  const [activeTab, setActiveTab] = useState('assignments'); // 'assignments' | 'projects' | 'employees' | 'departments'
+  const [activeTab, setActiveTab] = useState('projects'); // 'assignments' | 'projects' | 'employees' | 'departments'
+
+  // Auth Form states
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [authRole, setAuthRole] = useState('EMPLOYEE');
+  const [authError, setAuthError] = useState(null);
+  const [authSubmitting, setAuthSubmitting] = useState(false);
 
   // Department Form state
   const [deptName, setDeptName] = useState('');
@@ -44,7 +58,7 @@ function App() {
   const [assignEmpId, setAssignEmpId] = useState('');
   const [assignProjId, setAssignProjId] = useState('');
 
-  // Fetch initial data from GraphQL backend
+  // 1. Fetch dashboard data
   const loadData = async () => {
     try {
       setLoading(true);
@@ -61,11 +75,77 @@ function App() {
     }
   };
 
+  // 2. Initial Auth Check on page load
   useEffect(() => {
-    loadData();
+    const checkInitialAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const data = await fetchGraphQL(ME_QUERY);
+          if (data?.me) {
+            setCurrentUser(data.me);
+            await loadData();
+          } else {
+            localStorage.removeItem('token');
+          }
+        } catch {
+          localStorage.removeItem('token');
+          setCurrentUser(null);
+        }
+      }
+      setAuthChecking(false);
+    };
+
+    checkInitialAuth();
   }, []);
 
-  // 1. Add Department
+  // --- Auth Handlers ---
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setAuthError(null);
+    setAuthSubmitting(true);
+
+    try {
+      if (authMode === 'login') {
+        const data = await fetchGraphQL(LOGIN_MUTATION, {
+          email: authEmail,
+          password: authPassword,
+        });
+        localStorage.setItem('token', data.login.token);
+        setCurrentUser(data.login.user);
+        setMessage(`Welcome back, ${data.login.user.name}!`);
+      } else {
+        const data = await fetchGraphQL(REGISTER_MUTATION, {
+          name: authName,
+          email: authEmail,
+          password: authPassword,
+          role: authRole,
+        });
+        localStorage.setItem('token', data.register.token);
+        setCurrentUser(data.register.user);
+        setMessage(`Account created successfully as ${data.register.user.role}!`);
+      }
+
+      setAuthPassword('');
+      await loadData();
+    } catch (err) {
+      setAuthError(err.message);
+    } finally {
+      setAuthSubmitting(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setCurrentUser(null);
+    setDepartments([]);
+    setEmployees([]);
+    setProjects([]);
+    setEmployeeProjects([]);
+    setMessage('Logged out successfully.');
+  };
+
+  // --- CRUD Handlers ---
   const handleAddDepartment = async (e) => {
     e.preventDefault();
     if (!deptName.trim()) return;
@@ -81,7 +161,6 @@ function App() {
     }
   };
 
-  // 2. Add Employee
   const handleAddEmployee = async (e) => {
     e.preventDefault();
     if (!empName.trim() || !empEmail.trim()) return;
@@ -106,7 +185,6 @@ function App() {
     }
   };
 
-  // 3. Add Project
   const handleAddProject = async (e) => {
     e.preventDefault();
     if (!projName.trim() || !projResources.trim()) return;
@@ -133,7 +211,6 @@ function App() {
     }
   };
 
-  // 4. Assign Employee to Project
   const handleAssignProject = async (e) => {
     e.preventDefault();
     if (!assignEmpId || !assignProjId) {
@@ -160,7 +237,6 @@ function App() {
     }
   };
 
-  // 5. Remove Project Assignment
   const handleRemoveAssignment = async (id, empName, projName) => {
     if (
       !window.confirm(
@@ -179,7 +255,6 @@ function App() {
     }
   };
 
-  // Delete Handlers
   const handleDeleteEmployee = async (id, name) => {
     if (!window.confirm(`Are you sure you want to delete ${name}?`)) return;
     try {
@@ -217,22 +292,189 @@ function App() {
     }
   };
 
+  // ================= 1. INITIAL SESSION CHECKING SCREEN =================
+  if (authChecking) {
+    return (
+      <div className="auth-loading-screen">
+        <div className="spinner"></div>
+        <p>Connecting to GraphQL Server...</p>
+      </div>
+    );
+  }
+
+  // ================= 2. UNPROTECTED: LOGIN / SIGNUP PAGE ONLY =================
+  if (!currentUser) {
+    return (
+      <div className="auth-page-container">
+        <div className="auth-page-card">
+          <div className="auth-brand">
+            <div className="auth-logo-badge">⚡</div>
+            <h1>GraphQL Portal</h1>
+            <p className="auth-subtitle">
+              Sign in or create an account to access the enterprise dashboard
+            </p>
+          </div>
+
+          {authError && <div className="alert alert-error">{authError}</div>}
+          {message && <div className="alert alert-success">{message}</div>}
+
+          {/* Toggle Login / Register */}
+          <div className="auth-tab-group">
+            <button
+              type="button"
+              className={`auth-tab-btn ${authMode === 'login' ? 'active' : ''}`}
+              onClick={() => {
+                setAuthMode('login');
+                setAuthError(null);
+              }}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              className={`auth-tab-btn ${authMode === 'register' ? 'active' : ''}`}
+              onClick={() => {
+                setAuthMode('register');
+                setAuthError(null);
+              }}
+            >
+              Create Account
+            </button>
+          </div>
+
+          <form onSubmit={handleAuthSubmit} className="form">
+            {authMode === 'register' && (
+              <div className="form-group">
+                <label>Full Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. John Doe"
+                  value={authName}
+                  onChange={(e) => setAuthName(e.target.value)}
+                  required
+                />
+              </div>
+            )}
+
+            <div className="form-group">
+              <label>Email Address</label>
+              <input
+                type="email"
+                placeholder="e.g. user@company.com"
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Password</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                required
+              />
+            </div>
+
+            {authMode === 'register' && (
+              <div className="form-group">
+                <label>Role</label>
+                <select
+                  value={authRole}
+                  onChange={(e) => setAuthRole(e.target.value)}
+                >
+                  <option value="EMPLOYEE">Employee (Standard Access)</option>
+                  <option value="ADMIN">Admin (Full Control)</option>
+                </select>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="btn btn-primary btn-block"
+              disabled={authSubmitting}
+            >
+              {authSubmitting
+                ? 'Processing...'
+                : authMode === 'login'
+                ? 'Sign In to Dashboard'
+                : 'Create Account'}
+            </button>
+          </form>
+
+          <div className="auth-footer-hint">
+            {authMode === 'login' ? (
+              <p>
+                Don't have an account?{' '}
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => {
+                    setAuthMode('register');
+                    setAuthError(null);
+                  }}
+                >
+                  Register here
+                </button>
+              </p>
+            ) : (
+              <p>
+                Already have an account?{' '}
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => {
+                    setAuthMode('login');
+                    setAuthError(null);
+                  }}
+                >
+                  Sign In
+                </button>
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ================= 3. PROTECTED: FULL DASHBOARD (ONLY WHEN LOGGED IN) =================
   return (
     <div className="container">
+      {/* Top Navbar */}
+      <nav className="top-navbar">
+        <div className="logo-title">⚡ GraphQL Dashboard</div>
+
+        <div className="auth-profile-section">
+          <div className="user-profile">
+            <span className="user-avatar">
+              {currentUser.name.charAt(0).toUpperCase()}
+            </span>
+            <span className="user-name">{currentUser.name}</span>
+            <span
+              className={`role-pill ${
+                currentUser.role === 'ADMIN' ? 'role-admin' : 'role-employee'
+              }`}
+            >
+              {currentUser.role}
+            </span>
+            <button onClick={handleLogout} className="btn-logout">
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </nav>
+
       <header className="header">
-        <h1>GraphQL + PostgreSQL Dashboard</h1>
+        <h1>Enterprise Management Dashboard</h1>
         <p className="subtitle">
-          Manage Departments, Employees, Projects & Assignments via Apollo Server
+          Manage Departments, Employees, Projects & Assignments in PostgreSQL
         </p>
 
         {/* Tab Navigation */}
         <div className="tab-nav">
-          <button
-            className={`tab-btn ${activeTab === 'assignments' ? 'active' : ''}`}
-            onClick={() => setActiveTab('assignments')}
-          >
-            🔗 Assign Projects ({employeeProjects.length})
-          </button>
           <button
             className={`tab-btn ${activeTab === 'projects' ? 'active' : ''}`}
             onClick={() => setActiveTab('projects')}
@@ -251,153 +493,19 @@ function App() {
           >
             🏢 Departments ({departments.length})
           </button>
+          <button
+            className={`tab-btn ${activeTab === 'assignments' ? 'active' : ''}`}
+            onClick={() => setActiveTab('assignments')}
+          >
+            🔗 Project Assignments ({employeeProjects.length})
+          </button>
         </div>
       </header>
 
       {error && <div className="alert alert-error">{error}</div>}
       {message && <div className="alert alert-success">{message}</div>}
 
-      {/* ================= TAB: ASSIGN PROJECTS ================= */}
-      {activeTab === 'assignments' && (
-        <div className="tab-content">
-          <div className="card form-card">
-            <h2>Assign Employee to Project</h2>
-            <form onSubmit={handleAssignProject} className="form">
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Select Employee</label>
-                  <select
-                    value={assignEmpId}
-                    onChange={(e) => setAssignEmpId(e.target.value)}
-                    required
-                  >
-                    <option value="">-- Choose Employee --</option>
-                    {employees.map((emp) => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.name} ({emp.email})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Select Project</label>
-                  <select
-                    value={assignProjId}
-                    onChange={(e) => setAssignProjId(e.target.value)}
-                    required
-                  >
-                    <option value="">-- Choose Project --</option>
-                    {projects.map((proj) => (
-                      <option key={proj.id} value={proj.id}>
-                        {proj.projectName} [{proj.status}]
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={employees.length === 0 || projects.length === 0}
-              >
-                Assign Project
-              </button>
-
-              {employees.length === 0 && (
-                <p className="hint-text">
-                  ⚠️ No employees found. Please add an employee first.
-                </p>
-              )}
-              {projects.length === 0 && (
-                <p className="hint-text">
-                  ⚠️ No projects found. Please add a project first.
-                </p>
-              )}
-            </form>
-          </div>
-
-          <div className="data-section">
-            <div className="section-header">
-              <h2>Project Assignments ({employeeProjects.length})</h2>
-              <button onClick={loadData} className="btn btn-secondary">
-                Refresh
-              </button>
-            </div>
-
-            {loading ? (
-              <p className="loading">Loading assignments from GraphQL...</p>
-            ) : employeeProjects.length === 0 ? (
-              <p className="empty-state">
-                No employees are currently assigned to any projects. Use the form above to assign one!
-              </p>
-            ) : (
-              <div className="table-responsive">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Assignment ID</th>
-                      <th>Employee Name</th>
-                      <th>Email</th>
-                      <th>Project Name</th>
-                      <th>Project Status</th>
-                      <th>Assigned At</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {employeeProjects.map((item) => (
-                      <tr key={item.id}>
-                        <td>#{item.id}</td>
-                        <td>
-                          <strong>{item.employee?.name || `ID #${item.employeeId}`}</strong>
-                        </td>
-                        <td>{item.employee?.email || '-'}</td>
-                        <td>
-                          <span className="project-highlight">
-                            {item.project?.projectName || `ID #${item.projectId}`}
-                          </span>
-                        </td>
-                        <td>
-                          <span
-                            className={`badge ${getStatusClass(
-                              item.project?.status
-                            )}`}
-                          >
-                            {item.project?.status || 'Unknown'}
-                          </span>
-                        </td>
-                        <td>
-                          {item.createdAt
-                            ? new Date(item.createdAt).toLocaleDateString()
-                            : '-'}
-                        </td>
-                        <td>
-                          <button
-                            onClick={() =>
-                              handleRemoveAssignment(
-                                item.id,
-                                item.employee?.name,
-                                item.project?.projectName
-                              )
-                            }
-                            className="btn btn-danger btn-sm"
-                          >
-                            Remove
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ================= TAB: PROJECTS ================= */}
+      {/* ================= TAB 1: PROJECTS ================= */}
       {activeTab === 'projects' && (
         <div className="tab-content">
           <div className="card form-card">
@@ -539,7 +647,7 @@ function App() {
         </div>
       )}
 
-      {/* ================= TAB: EMPLOYEES ================= */}
+      {/* ================= TAB 2: EMPLOYEES ================= */}
       {activeTab === 'employees' && (
         <div className="tab-content">
           <div className="card form-card">
@@ -663,7 +771,7 @@ function App() {
         </div>
       )}
 
-      {/* ================= TAB: DEPARTMENTS ================= */}
+      {/* ================= TAB 3: DEPARTMENTS ================= */}
       {activeTab === 'departments' && (
         <div className="tab-content">
           <div className="card form-card">
@@ -699,6 +807,135 @@ function App() {
                     </p>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ================= TAB 4: ASSIGN PROJECTS ================= */}
+      {activeTab === 'assignments' && (
+        <div className="tab-content">
+          <div className="card form-card">
+            <h2>Assign Employee to Project</h2>
+            <form onSubmit={handleAssignProject} className="form">
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Select Employee</label>
+                  <select
+                    value={assignEmpId}
+                    onChange={(e) => setAssignEmpId(e.target.value)}
+                    required
+                  >
+                    <option value="">-- Choose Employee --</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name} ({emp.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Select Project</label>
+                  <select
+                    value={assignProjId}
+                    onChange={(e) => setAssignProjId(e.target.value)}
+                    required
+                  >
+                    <option value="">-- Choose Project --</option>
+                    {projects.map((proj) => (
+                      <option key={proj.id} value={proj.id}>
+                        {proj.projectName} [{proj.status}]
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={employees.length === 0 || projects.length === 0}
+              >
+                Assign Project
+              </button>
+            </form>
+          </div>
+
+          <div className="data-section">
+            <div className="section-header">
+              <h2>Project Assignments ({employeeProjects.length})</h2>
+              <button onClick={loadData} className="btn btn-secondary">
+                Refresh
+              </button>
+            </div>
+
+            {loading ? (
+              <p className="loading">Loading assignments from GraphQL...</p>
+            ) : employeeProjects.length === 0 ? (
+              <p className="empty-state">
+                No employees are currently assigned to any projects.
+              </p>
+            ) : (
+              <div className="table-responsive">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Assignment ID</th>
+                      <th>Employee Name</th>
+                      <th>Email</th>
+                      <th>Project Name</th>
+                      <th>Project Status</th>
+                      <th>Assigned At</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {employeeProjects.map((item) => (
+                      <tr key={item.id}>
+                        <td>#{item.id}</td>
+                        <td>
+                          <strong>{item.employee?.name || `ID #${item.employeeId}`}</strong>
+                        </td>
+                        <td>{item.employee?.email || '-'}</td>
+                        <td>
+                          <span className="project-highlight">
+                            {item.project?.projectName || `ID #${item.projectId}`}
+                          </span>
+                        </td>
+                        <td>
+                          <span
+                            className={`badge ${getStatusClass(
+                              item.project?.status
+                            )}`}
+                          >
+                            {item.project?.status || 'Unknown'}
+                          </span>
+                        </td>
+                        <td>
+                          {item.createdAt
+                            ? new Date(item.createdAt).toLocaleDateString()
+                            : '-'}
+                        </td>
+                        <td>
+                          <button
+                            onClick={() =>
+                              handleRemoveAssignment(
+                                item.id,
+                                item.employee?.name,
+                                item.project?.projectName
+                              )
+                            }
+                            className="btn btn-danger btn-sm"
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

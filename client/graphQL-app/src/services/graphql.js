@@ -1,10 +1,15 @@
-const GRAPHQL_ENDPOINT = 'http://localhost:8001/graphql';
+const GRAPHQL_ENDPOINT =
+  import.meta.env.VITE_GRAPHQL_ENDPOINT ||
+  (import.meta.env.DEV ? 'http://localhost:8001/graphql' : '/graphql');
 
 export async function fetchGraphQL(query, variables = {}) {
+  const token = localStorage.getItem('token');
+
   const response = await fetch(GRAPHQL_ENDPOINT, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({
       query,
@@ -65,6 +70,46 @@ export const GET_INITIAL_DATA = `
         projectName
         status
         resources
+      }
+    }
+  }
+`;
+
+export const ME_QUERY = `
+  query GetCurrentUser {
+    me {
+      id
+      name
+      email
+      role
+    }
+  }
+`;
+
+// Mutations - Auth
+export const LOGIN_MUTATION = `
+  mutation Login($email: String!, $password: String!) {
+    login(email: $email, password: $password) {
+      token
+      user {
+        id
+        name
+        email
+        role
+      }
+    }
+  }
+`;
+
+export const REGISTER_MUTATION = `
+  mutation Register($name: String!, $email: String!, $password: String!, $role: String) {
+    register(name: $name, email: $email, password: $password, role: $role) {
+      token
+      user {
+        id
+        name
+        email
+        role
       }
     }
   }

@@ -5,6 +5,7 @@ import { expressMiddleware } from '@as-integrations/express4';
 import 'dotenv/config';
 import { typeDefs, resolvers } from './src/graphql/index.js';
 import { initDb } from './src/db/initDb.js';
+import jwt from 'jsonwebtoken';
 
 async function startServer() {
   const app = express();
@@ -28,7 +29,22 @@ async function startServer() {
     '/graphql',
     cors(),
     express.json(),
-    expressMiddleware(server)
+    expressMiddleware(server, {
+      context: async ({ req }) => {
+        const authHeader = req.headers.authorization || '';
+        const token = authHeader.replace('Bearer ', '');
+
+        if (!token) return { user: null };
+
+        try {
+          const secret = process.env.JWT_SECRET || 'supersecretjwtkey_123456789';
+          const decoded = jwt.verify(token, secret);
+          return { user: decoded };
+        } catch (err) {
+          return { user: null };
+        }
+      }
+    })
   );
 
   app.listen({ port: PORT }, () => {
